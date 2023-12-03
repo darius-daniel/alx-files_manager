@@ -5,17 +5,17 @@ class UsersController {
   static async postNew(request, response) {
     const { email } = request.body;
     if (!email) {
-      response.status(400).send('Missing email');
+      response.status(400).send({'error': 'Missing email'});
     }
 
     const { password } = request.body;
     if (!password) {
-      response.status(400).send('Missing password');
+      response.status(400).send({'error': 'Missing password'});
     }
 
     const user = dbClient.db.collection('users').findOne({ email });
     if (user) {
-      response.status(400).send('Already exist');
+      response.status(400).send({'error': 'Already exist'});
     }
 
     const newUser = await dbClient.db.collection('users').insertOne({
