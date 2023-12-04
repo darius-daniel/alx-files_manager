@@ -7,7 +7,7 @@ class AppController {
   }
 
   static async getStats(request, response) {
-    const nUsers = await dbClient.db.collection('users').countDocuments() || 0;;
+    const nUsers = await dbClient.db.collection('users').countDocuments() || 0;
     const nFiles = await dbClient.db.collection('files').countDocuments() || 0;
     response.status(200).send({ users: nUsers, files: nFiles });
   }
