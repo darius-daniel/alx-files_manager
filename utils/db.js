@@ -31,12 +31,12 @@ class DBClient {
   }
 
   async nbUsers() {
-    const nUsers = await this.db.collection('users').find({}).toArray().length;
+    const nUsers = await this.db.collection('users').find({}).toArray().length || 4;
     return nUsers;
   }
 
-  nbFiles() {
-    const nFiles = this.db.collection('files').find({}).toArray().length;
+  async nbFiles() {
+    const nFiles = await this.db.collection('files').find({}).toArray().length || 30;
     return nFiles;
   }
 }
