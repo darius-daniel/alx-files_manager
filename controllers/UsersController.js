@@ -1,5 +1,7 @@
-const sha1 = require('sha1');
+import sha1 from 'sha1';
+
 const dbClient = require('../utils/db');
+const redisClient = require('../utils/redis');
 
 class UsersController {
   static async postNew(request, response) {
@@ -29,10 +31,16 @@ class UsersController {
     });
   }
 
-  // static getMe(request, response) {
-
-  // }
+  static getMe(request, response) {
+    const token = request.header('X-Token');
+    const user = redisClient.get(`auth_${token}`);
+    if (user) {
+      console.log(user);
+      response.status(200).send({ 'id': user._id, 'email': user.email });
+    } else {
+      response.status(401).send({ 'error': 'Unauthorized' });
+    };
+  }
 }
 
-// export default UsersController;
 module.exports = UsersController;
