@@ -13,6 +13,10 @@ class DBClient {
     this.main()
       .then(() => {
         this.isConnected = true;
+      })
+      .catch((error) => {
+        console.log('Connection failed');
+        console.error(error);
       });
 
     this.db = this.client.db(dbName);
@@ -20,7 +24,10 @@ class DBClient {
 
   async main() {
     // Use connect method to connect to the server
-    await this.client.connect();
+    await this.client.connect((error) => {
+      console.log('Connection to MongoDB server failed!');
+      console.error(error);
+    });
   }
 
   isAlive() {
