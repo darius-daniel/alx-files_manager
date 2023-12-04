@@ -8,10 +8,7 @@ class DBClient {
 
     const url = `mongodb://${host}:${port}`;
     this.isConnected = false;
-    this.client = new MongoClient(url, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    this.client = new MongoClient(url, { useUnifiedTopology: true });
 
     this.main()
       .then(() => {
