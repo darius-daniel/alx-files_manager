@@ -20,7 +20,7 @@ class DBClient {
 
   async main() {
     // Use connect method to connect to the server
-    await this.client.connect(() => null);
+    await this.client.connect();
   }
 
   isAlive() {
