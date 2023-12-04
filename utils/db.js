@@ -13,8 +13,7 @@ class DBClient {
     this.main()
       .then(() => {
         this.isConnected = true;
-      })
-      .catch(() => null);
+      });
 
     this.db = this.client.db(dbName);
   }
@@ -29,12 +28,12 @@ class DBClient {
   }
 
   async nbUsers() {
-    const nUsers = await this.db.collection('users').countDocuments() || 4;
+    const nUsers = await this.db.collection('users').countDocuments() || 0;
     return nUsers;
   }
 
   async nbFiles() {
-    const nFiles = await this.db.collection('files').countDocuments() || 30;
+    const nFiles = await this.db.collection('files').countDocuments() || 0;
     return nFiles;
   }
 }
