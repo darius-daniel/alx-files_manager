@@ -10,7 +10,7 @@ class DBClient {
     this.isConnected = false;
     this.client = new MongoClient(url, {
       useNewUrlParser: true,
-      useUnifiedTopology: true
+      useUnifiedTopology: true,
     });
 
     this.main()
