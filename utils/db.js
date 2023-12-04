@@ -14,18 +14,14 @@ class DBClient {
       .then(() => {
         this.isConnected = true;
       })
-      .catch(() => {
-        console.log('Connection failed');
-      });
+      .catch(() => null);
 
     this.db = this.client.db(dbName);
   }
 
   async main() {
     // Use connect method to connect to the server
-    await this.client.connect(() => {
-      console.log('Connection to MongoDB server failed!');
-    });
+    await this.client.connect(() => null);
   }
 
   isAlive() {
