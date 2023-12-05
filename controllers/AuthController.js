@@ -15,18 +15,19 @@ class AuthController {
       const token = uuidv4();
       const key = `auth_${token}`;
 
-      redisClient.set(key, user, (60 * 60 * 24) * 1000);
+      redisClient.set(key, user, (60 * 60 * 24));
       response.status(200).send({ token });
     }
   }
 
-  static getDisconnect(request, response) {
+  static async getDisconnect(request, response) {
     const token = request.header('X-Token');
     const key = `auth_${token}`;
     const users = dbClient.db.collection('users');
-    const user = redisClient.get(key);
+    const usr = redisClient.get(key);
+    const user = await (await users.findOne(usr));
 
-    if (!users.findOne(user)) {
+    if (!user) {
       response.status(401).send({ error: 'Unauthorized' });
     } else {
       redisClient.del(key);

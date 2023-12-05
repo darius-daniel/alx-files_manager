@@ -19,18 +19,19 @@ class UsersController {
     }
   }
 
-  static getMe(request, response) {
+  static async getMe(request, response) {
     const token = request.header('X-Token');
     const key = `auth_${token}`;
     const users = dbClient.db.collection('users');
-    const user = redisClient.get(key);
+    const usr = await (await redisClient.get(key));
 
-    if (!users.findOne(user)) {
+    if (!usr) {
       response.status(401).send({ error: 'Unauthorized' });
     } else {
-      response.status(201).send({
-        email: users.findOne(user).email,
-        id: users.findOne(user)._id,
+      const user = await (await users.findOne({ usr }));
+      response.status(200).send({
+        email: user.email,
+        id: user._id,
       });
     }
   }
