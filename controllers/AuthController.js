@@ -5,34 +5,38 @@ import redisClient from '../utils/redis';
 
 class AuthController {
   static getConnect(request, response) {
-    const password = request.header('Authorization').split(' ')[1];
+    const pwd = request.header('Authorization').split(' ')[1];
     const users = dbClient.db.collection('user');
-    const user = users.findOne({ password: sha1(password) });
 
-    if (!user) {
-      response.status(401).send({ error: 'Unauthorized' });
-    } else {
-      const token = uuidv4();
-      const key = `auth_${token}`;
+    users.findOne({ password: sha1(pwd) })
+      .then((user) => {
+        if (!user) {
+          response.status(401).send({ error: 'Unauthorized' });
+        } else {
+          const token = uuidv4();
+          const key = `auth_${token}`;
 
-      redisClient.set(key, user, (60 * 60 * 24));
-      response.status(200).send({ token });
-    }
+          redisClient.set(key, user.toString(), 60 * 60 * 24);
+          response.status(200).send({ token });
+        }
+      });
   }
 
   static async getDisconnect(request, response) {
     const token = request.header('X-Token');
     const key = `auth_${token}`;
     const users = dbClient.db.collection('users');
-    const usr = redisClient.get(key);
-    const user = await (await users.findOne(usr));
 
-    if (!user) {
-      response.status(401).send({ error: 'Unauthorized' });
-    } else {
-      redisClient.del(key);
-      response.status(204).send();
-    }
+
+    users.findOne(await redisClient.get(key))
+      .then((user) => {
+        if (!user) {
+          response.status(401).send({ error: 'Unauthorized' });
+        } else {
+          redisClient.del(key);
+          response.status(204).send();
+        }
+      });
   }
 }
 
