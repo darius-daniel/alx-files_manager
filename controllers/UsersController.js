@@ -30,7 +30,11 @@ class UsersController {
     } else {
       users.findOne({ _id: userId })
         .then((user) => {
-          response.status(200).send({ email: user.email.toString(), id: userId.toString() });
+          if (!user) {
+            response.status(401).send({ error: 'Unauthorized '});
+          } else {
+            response.status(200).send({ email: user.email.toString(), id: userId.toString() });
+          }
         });
     }
   }
