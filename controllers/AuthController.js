@@ -4,19 +4,19 @@ import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
 
 class AuthController {
-  static getConnect(request, response) {
+  static async getConnect(request, response) {
     const pwd = request.header('Authorization').split(' ')[1];
     const users = dbClient.db.collection('user');
 
     users.findOne({ password: sha1(pwd) })
-      .then((user) => {
+      .then(async (user) => {
         if (!user) {
           response.status(401).send({ error: 'Unauthorized' });
         } else {
           const token = uuidv4();
           const key = `auth_${token}`;
 
-          redisClient.set(key, user.toString(), 60 * 60 * 24);
+          await redisClient.set(key, user.toString(), 60 * 60 * 24);
           response.status(200).send({ token });
         }
       });
@@ -28,11 +28,11 @@ class AuthController {
     const users = dbClient.db.collection('users');
 
     users.findOne(await redisClient.get(key))
-      .then((user) => {
+      .then(async (user) => {
         if (!user) {
           response.status(401).send({ error: 'Unauthorized' });
         } else {
-          redisClient.del(key);
+          await redisClient.del(key);
           response.status(204).send();
         }
       });

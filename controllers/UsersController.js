@@ -14,7 +14,7 @@ class UsersController {
     } else if (await (await users.findOne({ email }))) {
       response.status(400).send({ error: 'Already exist' });
     } else {
-      const newUser = await (await users.insertOne({ email, password: sha1(password) }));
+      const newUser = await users.insertOne({ email, password: sha1(password) });
       response.status(201).send({ id: newUser.insertedId, email });
     }
   }
@@ -23,16 +23,15 @@ class UsersController {
     const token = request.header('X-Token');
     const key = `auth_${token}`;
     const users = dbClient.db.collection('users');
-    const usr = await (await redisClient.get(key));
+    const usr = await redisClient.get(key);
 
     if (!usr) {
       response.status(401).send({ error: 'Unauthorized' });
     } else {
-      const user = await (await users.findOne({ usr }));
-      response.status(200).send({
-        email: user.email,
-        id: user._id,
-      });
+      users.findOne({ email: usr.email })
+        .then((user) => {
+          response.status(200).send({ email: user.email, id: user._id });
+        });
     }
   }
 }
