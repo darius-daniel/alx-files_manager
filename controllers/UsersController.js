@@ -23,12 +23,12 @@ class UsersController {
     const token = request.header('X-Token');
     const key = `auth_${token}`;
     const users = dbClient.db.collection('users');
-    const usr = await redisClient.get(key);
+    const userId = await redisClient.get(key);
 
-    if (!usr) {
+    if (!userId) {
       response.status(401).send({ error: 'Unauthorized' });
     } else {
-      users.findOne({ email: usr.email })
+      users.findOne({ _id: userId })
         .then((user) => {
           response.status(200).send({ email: user.email, id: user._id });
         });
