@@ -27,7 +27,6 @@ class AuthController {
     const key = `auth_${token}`;
     const users = dbClient.db.collection('users');
 
-
     users.findOne(await redisClient.get(key))
       .then((user) => {
         if (!user) {
