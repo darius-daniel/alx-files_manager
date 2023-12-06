@@ -27,7 +27,7 @@ class AuthController {
     const key = `auth_${token}`;
     const users = dbClient.db.collection('users');
 
-    users.findOne(await redisClient.get(key))
+    users.findOne({ _id: await redisClient.get(key) })
       .then(async (userId) => {
         if (!userId) {
           response.status(401).send({ error: 'Unauthorized' });
