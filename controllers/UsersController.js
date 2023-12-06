@@ -30,7 +30,7 @@ class UsersController {
     } else {
       users.findOne({ _id: userId })
         .then((user) => {
-          response.status(200).send({ email: user.email, id: userId });
+          response.status(200).send({ email: user.email.toString(), id: userId.toString() });
         });
     }
   }
