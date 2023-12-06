@@ -31,7 +31,7 @@ class UsersController {
       users.findOne({ _id: userId })
         .then((user) => {
           if (!user) {
-            response.status(401).send({ error: 'Unauthorized '});
+            response.status(401).send({ error: 'Unauthorized' });
           } else {
             response.status(200).send({ email: user.email.toString(), id: userId.toString() });
           }
