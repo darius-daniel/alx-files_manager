@@ -1,6 +1,7 @@
 import { writeFile, existsSync, mkdir } from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { ObjectId } from 'mongodb';
 import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
 
@@ -40,16 +41,17 @@ class FilesController {
           data,
           isPublic,
           parentId: parentId || 0,
-          userId: user._id.toString(),
+          userId: user._id,
         };
 
         let file;
         if (type === 'folder') {
           file = await files.insert(document);
+          response.status(201).send(file);
         } else {
           const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
           if (!existsSync(folderPath)) {
-            mkdir(path, { recursive: true }, (error) => {
+            mkdir(folderPath, { recursive: true }, (error) => {
               if (error) {
                 console.error(`Cannot create directory ${path}`);
               }
@@ -57,7 +59,7 @@ class FilesController {
           }
 
           const fileName = uuidv4();
-          const filePath = `${path}/${fileName}`;
+          const filePath = `${folderPath}/${fileName}`;
           writeFile(filePath, atob(data), (error) => {
             if (error) {
               console.error(`Cannot create file ${filePath}`);
@@ -69,9 +71,15 @@ class FilesController {
           } else {
             document.localPath = folderPath;
           }
-          file = await files.insert(document);
+
+          const insertedInfo = await files.insertOne(document);
+          files.findOne({ _id: ObjectId(insertedInfo.insertedId) })
+            .then((file) => {
+              if (file) {
+                response.status(201).send(file);
+              }
+            });
         }
-        response.status(201).send(file);
       }
     }
   }
