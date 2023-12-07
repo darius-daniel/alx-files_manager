@@ -1,4 +1,5 @@
 import sha1 from 'sha1';
+import { ObjectId } from 'mongodb';
 import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
 
@@ -11,7 +12,7 @@ class UsersController {
       response.status(400).send({ error: 'Missing email' });
     } else if (!password) {
       response.status(400).send({ error: 'Missing password' });
-    } else if (await (await users.findOne({ email }))) {
+    } else if (await users.findOne({ email })) {
       response.status(400).send({ error: 'Already exist' });
     } else {
       const newUser = await users.insertOne({ email, password: sha1(password) });
@@ -28,7 +29,7 @@ class UsersController {
     if (!userId) {
       response.status(401).send({ error: 'Unauthorized' });
     } else {
-      users.findOne({ _id: userId })
+      users.findOne({ _id: ObjectId(userId) })
         .then((user) => {
           if (!user) {
             response.status(401).send({ error: 'Unauthorized' });
