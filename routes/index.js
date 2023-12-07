@@ -1,6 +1,7 @@
 import AppController from '../controllers/AppController';
 import AuthController from '../controllers/AuthController';
 import UsersController from '../controllers/UsersController';
+import FilesController from '../controllers/FilesController';
 
 function routes(app) {
   app.get('/status', AppController.getStatus);
@@ -11,6 +12,8 @@ function routes(app) {
 
   app.get('/connect', AuthController.getConnect);
   app.get('/disconnect', AuthController.getDisconnect);
+
+  app.post('/files', FilesController.postUpload);
 }
 
-module.exports = routes;
+export default routes;
