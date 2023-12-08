@@ -14,8 +14,10 @@ function routes(app) {
   app.get('/disconnect', AuthController.getDisconnect);
 
   app.post('/files', FilesController.postUpload);
-  // app.get('/files/:id', FilesController.getShow);
-  // app.get('/files', FilesController.getIndex);
+  app.get('/files/:id', FilesController.getShow);
+  app.get('/files', FilesController.getIndex);
+  app.put('/files/:id/publish', FilesController.putPublish);
+  app.put('/files/:id/publish', FilesController.putUnpublish);
 }
 
 export default routes;
