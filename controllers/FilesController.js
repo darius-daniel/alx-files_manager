@@ -1,22 +1,29 @@
-import { writeFile, existsSync, mkdir } from 'fs';
+import {
+  readFile, writeFile, existsSync, mkdir,
+} from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { ObjectId } from 'mongodb';
 import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
+import fileQueue from '../worker';
+
+const mime = require('mime-types');
+const imageThumbnail = require('image-thumbnail');
 
 class FilesController {
   static async postUpload(request, response) {
     const token = request.header('X-Token');
     const userId = await redisClient.get(`auth_${token}`);
-    const files = dbClient.db.collection('files');
+    const filesCollection = dbClient.db.collection('files');
 
     if (!userId) {
       response.status(401).send({ error: 'Unauthorized' });
     } else {
       const {
-        name, type, data, parentId,
+        name, type, data,
       } = request.body;
+      let { parentId } = request.body;
       const isPublic = request.body.isPublic || false;
 
       if (!name) {
@@ -26,7 +33,7 @@ class FilesController {
       } else if (!data && type !== 'folder') {
         response.status(400).send({ error: 'Missing name' });
       } else if (parentId) {
-        files.findOne({ parentId })
+        filesCollection.findOne({ parentId })
           .then((file) => {
             if (!file) {
               response.status(400).send({ error: 'Parent not found' });
@@ -35,14 +42,20 @@ class FilesController {
             }
           });
       } else if (type === 'folder') {
-        const insertInfo = await files.insertOne({
+        if (parentId) {
+          parentId = ObjectId(parentId);
+        } else {
+          parentId = 0;
+        }
+
+        const insertInfo = await filesCollection.insertOne({
           name,
           type,
           isPublic,
-          parentId: parentId || 0,
-          userId,
+          parentId,
+          userId: ObjectId(userId),
         });
-        files.findOne({ _id: ObjectId(insertInfo.insertedId) })
+        filesCollection.findOne({ _id: ObjectId(insertInfo.insertedId) })
           .then((file) => {
             if (file) {
               response.status(201).send(file);
@@ -50,7 +63,7 @@ class FilesController {
           });
       } else {
         const folderPath = process.env.FOLDER_PATH || '/tmp/files_manager';
-        if (!existsSync(folderPath)) {
+        if (existsSync(folderPath) === false) {
           mkdir(folderPath, { recursive: true }, (error) => {
             if (error) {
               console.error(`Cannot create directory ${path}`);
@@ -66,46 +79,103 @@ class FilesController {
           }
         });
 
+        if (parentId) {
+          parentId = ObjectId(parentId);
+        } else {
+          parentId = 0;
+        }
+
         const document = {
           name,
           type,
           isPublic,
-          parentId: parentId || 0,
-          userId,
+          parentId,
+          userId: ObjectId(userId),
         };
+
         if (type === 'file' || type === 'image') {
           document.localPath = path.resolve(filePath);
-        } else {
+        } else if (type === 'folder') {
           document.localPath = folderPath;
         }
 
-        const insertedInfo = await files.insertOne(document);
-        files.findOne({ _id: ObjectId(insertedInfo.insertedId) })
+        const insertedInfo = await filesCollection.insertOne(document);
+        filesCollection.findOne({ _id: ObjectId(insertedInfo.insertedId) })
           .then((file) => {
             if (file) {
               response.status(201).send(file);
             }
           });
+
+        if (type === 'image') {
+          fileQueue.add({ userId, fileId: insertedInfo.insertedId });
+
+          fileQueue.process((job, done) => {
+            if (!job.data.filedId) {
+              throw new Error('Missing fileId');
+            } else if (!job.data.userId) {
+              throw new Error('Missing userId');
+            } else {
+              filesCollection.findeOne({
+                _id: ObjectId(job.data.fileId),
+                userId: ObjectId(job.data.userId),
+              })
+                .then((file) => {
+                  if (!file) {
+                    throw new Error('File not found');
+                  } else {
+                    const thumbnailWidths = [500, 250, 100];
+
+                    for (const width of thumbnailWidths) {
+                      const name = `${document.localPath}_${width}`;
+
+                      imageThumbnail(name, { width, height: width })
+                        .then((thumbnail) => {
+                          console.log(thumbnail);
+                        })
+                        .catch((error) => {
+                          throw error;
+                        });
+                    }
+                  }
+                });
+            }
+            done();
+          });
+        }
       }
     }
   }
 
   static async getShow(request, response) {
-    const { parentId } = request.params;
+    const { id } = request.params;
+    const { size } = request.query;
     const token = request.header('X-Token');
     const key = `auth-${token}`;
-    const files = await dbClient.db.collection('files');
 
     const userId = await redisClient.get(key);
+    console.log(userId);
     if (!userId) {
       response.status(401).send({ error: 'Unauthorized' });
     } else {
-      files.findOne({ parentId })
+      dbClient.db.collection('files').findOne({ _id: ObjectId(id), userId: ObjectId(userId) })
         .then((file) => {
           if (!file) {
             response.status(404).send({ error: 'Not found' });
+          } else if (size) {
+            const thumbnailName = `${file.localPath}_${size}`;
+
+            if (existsSync(thumbnailName) === true) {
+              readFile(thumbnailName, (error, data) => {
+                if (!error) {
+                  response.send(data);
+                }
+              });
+            } else {
+              response.status(404).send({ error: 'Not found' });
+            }
           } else {
-            response.status(200).send(JSON.stringify(file));
+            response.status(200).send(file);
           }
         });
     }
@@ -119,22 +189,32 @@ class FilesController {
     if (!user) {
       response.status(401).send({ error: 'Unauthorized' });
     } else {
-      const { page } = request.query;
-      const parentId = request.query.parentId || 0;
-
+      let { page, parentId } = request.query;
       const filesCollection = dbClient.db.collection('files');
-      const files = await filesCollection.find({ parentId }).toArray();
+
+      if (parentId) {
+        parentId = ObjectId(parentId);
+      } else {
+        parentId = 0;
+      }
+
+      const files = filesCollection.find({ parentId: ObjectId(parentId) }).toArray();
       if (!files) {
         response.send([]);
       } else {
         const maxPerPage = 20;
+        if (!page) {
+          page = 0;
+        } else {
+          page = parseInt(page, 10);
+        }
 
-        // const pageContents = await filesCollection.aggregate([
-        //   { $match: { parentId } },
-        //   { $skip: parseInt(page) * maxPerPage },
-        //   { $limit: maxPerPage },
-        // ]).toArray();
-        response.send(JSON.stringify(files.slice(page * maxPerPage, (page + 1) * maxPerPage)));
+        const pageContents = await filesCollection.aggregate([
+          { $match: { parentId } },
+          { $skip: page * maxPerPage },
+          { $limit: maxPerPage },
+        ]).toArray();
+        response.send(pageContents);
       }
     }
   }
@@ -150,17 +230,17 @@ class FilesController {
     } else {
       const filesCollection = dbClient.db.collection('files');
 
-      filesCollection.findOne({ userId, _id: ObjectId(id) })
+      filesCollection.findOne({ userId: ObjectId(userId), _id: ObjectId(id) })
         .then(async (file) => {
           if (!file) {
             response.status(404).send({ error: 'Not found' });
           } else {
-            const updateResult = await filesCollection.updateOne(
-              { userId },
+            await filesCollection.updateOne(
+              file,
               { $set: { isPublic: true } },
             );
 
-            response.status(200).send(JSON.stringify(file));
+            response.status(200).send(file);
           }
         });
     }
@@ -177,20 +257,50 @@ class FilesController {
     } else {
       const filesCollection = dbClient.db.collection('files');
 
-      filesCollection.findOne({ userId, _id: ObjectId(id) })
+      filesCollection.findOne({ userId: ObjectId(userId), _id: ObjectId(id) })
         .then(async (file) => {
           if (!file) {
             response.status(404).send({ error: 'Not found' });
           } else {
-            const updateResult = await filesCollection.updateOne(
-              { userId },
+            await filesCollection.updateOne(
+              file,
               { $set: { isPublic: false } },
             );
 
-            response.status(200).send(JSON.stringify(file));
+            response.status(200).send(file);
           }
         });
     }
+  }
+
+  static getFile(request, response) {
+    const { id } = request.params;
+
+    dbClient.db.collection('files').findOne({ _id: ObjectId(id) })
+      .then(async (file) => {
+        if (!file) {
+          response.status(404).send({ error: 'Not found' });
+        } else {
+          const token = request.header('X-Token');
+          const key = `auth_${token}`;
+          const userId = await redisClient.get(key);
+
+          if (file.isPublic === false || !userId || userId !== file.userId) {
+            response.status(404).send({ error: 'Not found' });
+          } else if (file.type === 'folder') {
+            response.status(400).send({ error: "A folder doesn't have content" });
+          } else if (existsSync(file.localPath) === false) {
+            response.status(404).send({ error: 'Not found' });
+          } else {
+            readFile(file.localPath, (error, data) => {
+              if (data) {
+                const mimeType = mime.lookup(file.name);
+                response.send(data, mimeType);
+              }
+            });
+          }
+        }
+      });
   }
 }
 

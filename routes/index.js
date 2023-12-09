@@ -18,6 +18,7 @@ function routes(app) {
   app.get('/files', FilesController.getIndex);
   app.put('/files/:id/publish', FilesController.putPublish);
   app.put('/files/:id/publish', FilesController.putUnpublish);
+  app.get('/files/:id/data', FilesController.getFile);
 }
 
 export default routes;
