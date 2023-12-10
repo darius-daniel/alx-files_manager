@@ -6,35 +6,36 @@ import redisClient from '../utils/redis';
 class UsersController {
   static async postNew(request, response) {
     const { email, password } = request.body;
-    const users = dbClient.db.collection('users');
 
     if (!email) {
       response.status(400).send({ error: 'Missing email' });
     } else if (!password) {
       response.status(400).send({ error: 'Missing password' });
-    } else if (await users.findOne({ email })) {
+    } else if (await dbClient.db.collection('users').findOne({ email, password: sha1(password) })) {
       response.status(400).send({ error: 'Already exist' });
     } else {
-      const newUser = await users.insertOne({ email, password: sha1(password) });
-      response.status(201).send({ id: newUser.insertedId, email });
+      const newUser = await dbClient.db.collection('users').insertOne({
+        email,
+        password: sha1(password)
+      });
+      response.status(201).send({ id: newUser.insertedId.toString(), email });
     }
   }
 
   static async getMe(request, response) {
     const token = request.header('X-Token');
     const key = `auth_${token}`;
-    const users = dbClient.db.collection('users');
     const userId = await redisClient.get(key);
 
     if (!userId) {
       response.status(401).send({ error: 'Unauthorized' });
     } else {
-      users.findOne({ _id: ObjectId(userId) })
+      dbClient.db.collection('users').findOne({ _id: ObjectId(userId) })
         .then((user) => {
           if (!user) {
             response.status(401).send({ error: 'Unauthorized' });
           } else {
-            response.status(200).send({ email: user.email.toString(), id: userId.toString() });
+            response.status(200).send({ email: user.email, id: userId.toString() });
           }
         });
     }

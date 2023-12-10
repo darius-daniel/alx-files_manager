@@ -85,22 +85,28 @@ class FilesController {
           parentId = 0;
         }
 
-        const document = {
-          name,
-          type,
-          isPublic,
-          parentId,
-          userId: ObjectId(userId),
-        };
-
+        let insertInfo;
         if (type === 'file' || type === 'image') {
-          document.localPath = path.resolve(filePath);
+          insertInfo = await filesCollection.insertOne({
+            name,
+            type,
+            isPublic,
+            parentId,
+            userId: ObjectId(userId),
+            localPath: path.resolve(filePath),
+          });
         } else if (type === 'folder') {
-          document.localPath = folderPath;
+          insertInfo = await filesCollection.insertOne({
+            name,
+            type,
+            isPublic,
+            parentId,
+            userId: ObjectId(userId),
+            localPath: folderPath,
+          });
         }
 
-        const insertedInfo = await filesCollection.insertOne(document);
-        filesCollection.findOne({ _id: ObjectId(insertedInfo.insertedId) })
+        filesCollection.findOne({ _id: ObjectId(insertInfo.insertedId) })
           .then((file) => {
             if (file) {
               response.status(201).send(file);
@@ -293,7 +299,9 @@ class FilesController {
             response.status(404).send({ error: 'Not found' });
           } else {
             readFile(file.localPath, (error, data) => {
-              if (data) {
+              if (error) {
+                response.status(400).send({ error: error.message });
+              } else {
                 const mimeType = mime.lookup(file.name);
                 response.send(data, mimeType);
               }

@@ -8,9 +8,8 @@ class AuthController {
     const credentials = atob(request.header('Authorization').split(' ')[1]).split(':');
     const email = credentials[0];
     const pwd = credentials[1];
-    const users = dbClient.db.collection('users');
 
-    users.findOne({ email, password: sha1(pwd) })
+    dbClient.db.collection('users').findOne({ email, password: sha1(pwd) })
       .then(async (user) => {
         if (!user) {
           response.status(401).send({ error: 'Unauthorized' });
@@ -28,7 +27,6 @@ class AuthController {
     const token = request.header('X-Token');
     const key = `auth_${token}`;
     const user = await redisClient.get(key);
-    console.log(user);
 
     if (!user) {
       response.status(401).send({ error: 'Unauthorized' });
